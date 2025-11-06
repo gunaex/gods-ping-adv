@@ -398,6 +398,51 @@ async def get_orderbook(symbol: str, limit: int = 20):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/market/forecast/{symbol}")
+async def get_price_forecast(
+    symbol: str,
+    forecast_hours: int = 6,
+    current_user: dict = Depends(get_current_active_user)
+):
+    """
+    Get AI-powered price forecast for next N hours.
+    Uses technical analysis, trend detection, and statistical models.
+    """
+    from app.market import get_candlestick_data
+    from app.price_forecaster import forecast_price_hourly, get_forecast_summary
+    
+    try:
+        # Get hourly candles (need at least 24 hours, get 100 for better analysis)
+        candles = await get_candlestick_data(symbol, timeframe='1h', limit=100)
+        
+        if not candles:
+            raise HTTPException(status_code=404, detail="No candle data available")
+        
+        # Generate forecast
+        forecast = forecast_price_hourly(candles, forecast_hours=forecast_hours)
+        
+        # Add summary text
+        forecast['summary'] = get_forecast_summary(forecast)
+        
+        return forecast
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/market/forecast/{base}/{quote}")
+async def get_price_forecast_pair(
+    base: str,
+    quote: str,
+    forecast_hours: int = 6,
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Get price forecast for a trading pair (e.g., BTC/USDT)"""
+    symbol = f"{base}/{quote}"
+    return await get_price_forecast(symbol, forecast_hours, current_user)
+
+
 # Account Balance
 @app.get("/api/account/balance")
 async def get_balance(
@@ -853,6 +898,64 @@ async def gods_hand_performance(
         'positions': positions,
         'last_trades': last_trades,
     }
+
+
+# Reset Paper Trading
+# ----------------------------------------------------------------------------
+@app.post("/api/bot/paper-trading/reset")
+async def reset_paper_trading(
+    symbol: Optional[str] = None,
+    current_user: dict = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Reset paper trading data for the current user.
+    Clears all paper trades and snapshots.
+    
+    Args:
+        symbol: Optional. If provided, only reset for this symbol.
+    """
+    from app.paper_trading_tracker import PaperTradingSnapshot
+    
+    try:
+        # Count before deletion
+        trades_query = db.query(Trade).filter(
+            Trade.user_id == current_user["id"],
+            Trade.status.in_(['completed_paper', 'simulated'])
+        )
+        snapshots_query = db.query(PaperTradingSnapshot).filter(
+            PaperTradingSnapshot.user_id == current_user["id"]
+        )
+        
+        # Filter by symbol if provided
+        if symbol:
+            trades_query = trades_query.filter(Trade.symbol == symbol)
+            snapshots_query = snapshots_query.filter(PaperTradingSnapshot.symbol == symbol)
+        
+        trade_count = trades_query.count()
+        snapshot_count = snapshots_query.count()
+        
+        # Delete trades
+        trades_query.delete(synchronize_session=False)
+        
+        # Delete snapshots
+        snapshots_query.delete(synchronize_session=False)
+        
+        db.commit()
+        
+        message = f"Reset complete for {symbol}" if symbol else "Reset complete for all symbols"
+        
+        return {
+            "success": True,
+            "message": message,
+            "deleted_trades": trade_count,
+            "deleted_snapshots": snapshot_count,
+            "symbol": symbol
+        }
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============================================================================

@@ -319,17 +319,25 @@ async def calculate_risk_assessment(symbol: str, config: BotConfig) -> dict:
         # Risk score (0-100, lower is safer)
         risk_score = min(100, volatility * 1000)
         
-        # Position sizing based on risk
+        # Position sizing: position_size_ratio is the ABSOLUTE MAX the user configured
+        # This is the hard limit that should never be exceeded
         max_position = config.budget * config.position_size_ratio
         
+        # Risk adjustments affect the RECOMMENDED position size within the max limit
+        # This guides the AI but doesn't prevent reaching the user's configured max
         if config.risk_level == 'conservative':
-            position_multiplier = 0.5
+            suggested_multiplier = 0.5
         elif config.risk_level == 'moderate':
-            position_multiplier = 0.75
+            suggested_multiplier = 0.75
         else:  # aggressive
-            position_multiplier = 1.0
+            suggested_multiplier = 1.0
         
-        recommended_position = max_position * position_multiplier * (1 - risk_score / 200)
+        # Suggested position considers risk, but max_position is the hard limit
+        suggested_position = max_position * suggested_multiplier * (1 - risk_score / 200)
+        
+        # The recommended_position_size is now the MAX position configured by user
+        # This allows incremental building up to the full position_size_ratio
+        recommended_position = max_position
         
         # Fee calculation (Binance spot: ~0.1%)
         trading_fee_rate = 0.001
@@ -341,6 +349,7 @@ async def calculate_risk_assessment(symbol: str, config: BotConfig) -> dict:
             "risk_level": config.risk_level,
             "volatility": round(volatility * 100, 2),
             "recommended_position_size": round(recommended_position, 2),
+            "suggested_position_size": round(suggested_position, 2),  # For reference/logging
             "estimated_fees": round(estimated_fees, 2),
             "max_daily_loss": config.max_daily_loss,
             "current_price": indicators['current_price'],

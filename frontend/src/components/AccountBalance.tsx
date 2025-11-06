@@ -219,6 +219,90 @@ export default function AccountBalance({ symbol, fiatCurrency }: AccountBalanceP
         </div>
       ) : balance ? (
         <div>
+          {/* Symbol-Specific Balance (if applicable) */}
+          {symbol && (() => {
+            // Extract base currency from symbol (e.g., BTC from BTC/USDT)
+            const baseCurrency = symbol.split('/')[0];
+            const quoteCurrency = symbol.split('/')[1] || 'USDT';
+            
+            // Find the asset for this trading pair
+            const baseAsset = balance.assets?.find(a => a.asset === baseCurrency);
+            const quoteAsset = balance.assets?.find(a => a.asset === quoteCurrency);
+            
+            if (baseAsset || quoteAsset) {
+              return (
+                <div style={{
+                  padding: '20px',
+                  background: `linear-gradient(135deg, ${colors.primary.sage}15 0%, ${colors.primary.coral}15 100%)`,
+                  border: `2px solid ${colors.primary.sage}`,
+                  borderRadius: '12px',
+                  marginBottom: '20px'
+                }}>
+                  <div style={{
+                    fontSize: '1.1rem',
+                    fontWeight: 700,
+                    color: colors.text.primary,
+                    marginBottom: '15px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    💰 {symbol} Balance
+                  </div>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                    gap: '12px'
+                  }}>
+                    {baseAsset && (
+                      <div style={{
+                        padding: '15px',
+                        background: colors.background.card,
+                        borderRadius: '8px',
+                        border: `1px solid ${colors.border.default}`
+                      }}>
+                        <div style={{ fontSize: '0.85rem', color: colors.text.secondary, marginBottom: '6px' }}>
+                          {baseCurrency}
+                        </div>
+                        <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: colors.primary.sage, marginBottom: '4px' }}>
+                          {baseAsset.total.toFixed(8)}
+                        </div>
+                        <div style={{ fontSize: '0.85rem', color: colors.text.secondary }}>
+                          {formatCurrency(baseAsset.usd_value)}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: colors.text.muted, marginTop: '4px' }}>
+                          Free: {baseAsset.free.toFixed(8)}
+                        </div>
+                      </div>
+                    )}
+                    {quoteAsset && (
+                      <div style={{
+                        padding: '15px',
+                        background: colors.background.card,
+                        borderRadius: '8px',
+                        border: `1px solid ${colors.border.default}`
+                      }}>
+                        <div style={{ fontSize: '0.85rem', color: colors.text.secondary, marginBottom: '6px' }}>
+                          {quoteCurrency}
+                        </div>
+                        <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: colors.primary.coral, marginBottom: '4px' }}>
+                          {quoteAsset.total.toFixed(2)}
+                        </div>
+                        <div style={{ fontSize: '0.85rem', color: colors.text.secondary }}>
+                          {formatCurrency(quoteAsset.usd_value)}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: colors.text.muted, marginTop: '4px' }}>
+                          Free: {quoteAsset.free.toFixed(2)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            }
+            return null;
+          })()}
+
           {/* Main Balance Cards */}
           <div style={{
             display: 'grid',

@@ -69,6 +69,9 @@ export const botAPI = {
   stopBot: (botType: string) => api.post(`/bot/${botType}/stop`),
   
   getStatus: () => api.get('/bot/status'),
+  
+  resetPaperTrading: (symbol?: string) => 
+    api.post('/bot/paper-trading/reset', {}, { params: symbol ? { symbol } : {} }),
 };
 
 export const settingsAPI = {

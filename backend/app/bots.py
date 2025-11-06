@@ -224,6 +224,16 @@ async def gods_hand_once(user_id: int, config: BotConfig, db: Session) -> dict:
     # Calculate incremental step amount (after any profit protection overrides)
     max_position_size = risk_assessment['recommended_position_size']
     
+    # 🔍 DEBUG: Position calculation
+    print(f"🔍 Position Debug for {symbol}:")
+    print(f"   Current position value: ${current_position['position_value_usd']:.2f}")
+    print(f"   Max position size (from AI): ${max_position_size:.2f}")
+    print(f"   Budget: ${config.budget:.2f}")
+    print(f"   Position Size Ratio: {config.position_size_ratio * 100:.1f}%")
+    print(f"   Expected max: ${config.budget * config.position_size_ratio:.2f}")
+    current_fill = (current_position['position_value_usd'] / max_position_size * 100) if max_position_size > 0 else 0
+    print(f"   Current fill: {current_fill:.1f}% of max_position_size")
+    
     # Dynamic step sizing: scale by confidence (0.5-1.0 confidence → 0.5x-1.5x step)
     confidence_multiplier = 0.5 + (confidence * 1.0) if confidence > 0 else 1.0
     base_step_percent = config.entry_step_percent if action == 'BUY' else config.exit_step_percent

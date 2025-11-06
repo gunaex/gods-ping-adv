@@ -44,7 +44,13 @@ try:
         'entry_step_percent': 10.0,
         'exit_step_percent': 10.0,
         'trailing_take_profit_percent': 2.5,
-        'hard_stop_loss_percent': 3.0
+        'hard_stop_loss_percent': 3.0,
+        'notification_email': None,  # String column
+        'notify_on_action': 0,  # Boolean (0 = False)
+        'notify_on_position_size': 0,  # Boolean
+        'notify_on_failure': 0,  # Boolean
+        'gmail_user': None,  # String column
+        'gmail_app_password': None,  # String column
     }
     
     for col_name, default_val in required_columns.items():
@@ -57,11 +63,28 @@ try:
         print(f"🔧 Adding {len(migrations_needed)} new columns to bot_configs table...")
         
         for col_name, default_val in migrations_needed:
-            cursor.execute(f"""
-                ALTER TABLE bot_configs 
-                ADD COLUMN {col_name} REAL DEFAULT {default_val}
-            """)
-            print(f"✅ Added {col_name} column (default: {default_val})")
+            # Determine column type and default value
+            if col_name in ['notification_email', 'gmail_user', 'gmail_app_password']:
+                # String columns
+                cursor.execute(f"""
+                    ALTER TABLE bot_configs 
+                    ADD COLUMN {col_name} TEXT DEFAULT NULL
+                """)
+                print(f"✅ Added {col_name} column (TEXT, default: NULL)")
+            elif col_name in ['notify_on_action', 'notify_on_position_size', 'notify_on_failure']:
+                # Boolean columns
+                cursor.execute(f"""
+                    ALTER TABLE bot_configs 
+                    ADD COLUMN {col_name} INTEGER DEFAULT {default_val}
+                """)
+                print(f"✅ Added {col_name} column (BOOLEAN, default: {default_val})")
+            else:
+                # Float columns
+                cursor.execute(f"""
+                    ALTER TABLE bot_configs 
+                    ADD COLUMN {col_name} REAL DEFAULT {default_val}
+                """)
+                print(f"✅ Added {col_name} column (default: {default_val})")
         
         # Commit changes
         conn.commit()

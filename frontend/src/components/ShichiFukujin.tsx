@@ -8,6 +8,7 @@ import TradingPairSelector from './TradingPairSelector';
 import AIRecommendation from './AIRecommendation';
 import AccountBalance from './AccountBalance';
 import MarketData from './MarketData';
+import PriceForecast from './PriceForecast';
 import BotsPanel from './BotsPanel';
 import AdvancedAnalysis from './AdvancedAnalysis';
 import GodsHand from './GodsHand';
@@ -109,8 +110,11 @@ export default function ShichiFukujin() {
       {/* Section 3: Account Balance & P/L */}
       <AccountBalance symbol={selectedSymbol} fiatCurrency={fiatCurrency} />
 
-  {/* Section 4: Market Data & Chart */}
-  <MarketData key={selectedSymbol} symbol={selectedSymbol} />
+      {/* Section 4: Market Data & Chart */}
+      <MarketData key={selectedSymbol} symbol={selectedSymbol} />
+
+      {/* Section 4.5: AI Price Forecast */}
+      <PriceForecast symbol={selectedSymbol} />
 
       <div className="grid grid-2">
         {/* Section 5: Grid Bot & DCA Bot */}

@@ -10,9 +10,11 @@ interface MarketDataProps {
 export default function MarketData({ symbol }: MarketDataProps) {
   const [ticker, setTicker] = useState<any>(null);
   const [candles, setCandles] = useState<any[]>([]);
+  const [tooltipData, setTooltipData] = useState<any>(null);
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
   const seriesRef = useRef<any>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
 
   // Load market data when symbol changes
   useEffect(() => {
@@ -62,6 +64,8 @@ export default function MarketData({ symbol }: MarketDataProps) {
       },
       timeScale: {
         borderColor: 'rgba(107, 114, 128, 0.4)', // subtle dark gray axis line
+        timeVisible: true, // Show time on X-axis
+        secondsVisible: false, // Don't show seconds
       },
     });
 
@@ -75,6 +79,56 @@ export default function MarketData({ symbol }: MarketDataProps) {
 
     chartRef.current = chart;
     seriesRef.current = candlestickSeries;
+
+    // Subscribe to crosshair move to show tooltip with time
+    chart.subscribeCrosshairMove((param) => {
+      if (!tooltipRef.current || !param.time) {
+        if (tooltipRef.current) {
+          tooltipRef.current.style.display = 'none';
+        }
+        setTooltipData(null);
+        return;
+      }
+
+      const data = param.seriesData.get(candlestickSeries) as any;
+      if (!data) {
+        tooltipRef.current.style.display = 'none';
+        setTooltipData(null);
+        return;
+      }
+
+      // Format timestamp to readable date and time
+      const timestamp = param.time as number;
+      const date = new Date(timestamp * 1000);
+      const dateStr = date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+      const timeStr = date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      });
+
+      // Update tooltip content
+      setTooltipData({
+        date: dateStr,
+        time: timeStr,
+        open: data.open?.toFixed(2),
+        high: data.high?.toFixed(2),
+        low: data.low?.toFixed(2),
+        close: data.close?.toFixed(2),
+      });
+
+      // Position tooltip
+      const coordinate = candlestickSeries.priceToCoordinate(data.close);
+      if (coordinate !== null && tooltipRef.current) {
+        tooltipRef.current.style.display = 'block';
+        tooltipRef.current.style.left = param.point?.x + 'px';
+        tooltipRef.current.style.top = '10px';
+      }
+    });
 
     const handleResize = () => {
       if (chartContainerRef.current && chartRef.current) {
@@ -164,7 +218,62 @@ export default function MarketData({ symbol }: MarketDataProps) {
         </div>
       )}
 
-      <div ref={chartContainerRef} className="chart-container" />
+      <div style={{ position: 'relative' }}>
+        <div ref={chartContainerRef} className="chart-container" />
+        
+        {/* Tooltip overlay */}
+        <div
+          ref={tooltipRef}
+          style={{
+            position: 'absolute',
+            display: 'none',
+            padding: '12px',
+            background: 'rgba(0, 0, 0, 0.9)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '8px',
+            color: '#fff',
+            fontSize: '0.85rem',
+            pointerEvents: 'none',
+            zIndex: 1000,
+            minWidth: '180px',
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)',
+          }}
+        >
+          {tooltipData && (
+            <>
+              <div style={{ 
+                fontWeight: 'bold', 
+                marginBottom: '8px',
+                paddingBottom: '8px',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
+              }}>
+                <div style={{ fontSize: '0.95rem' }}>{tooltipData.date}</div>
+                <div style={{ color: '#9ca3af', fontSize: '0.8rem', marginTop: '2px' }}>
+                  {tooltipData.time}
+                </div>
+              </div>
+              <div style={{ display: 'grid', gap: '4px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#9ca3af' }}>Open:</span>
+                  <span style={{ fontWeight: '500' }}>${tooltipData.open}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#9ca3af' }}>High:</span>
+                  <span style={{ fontWeight: '500', color: '#4ade80' }}>${tooltipData.high}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#9ca3af' }}>Low:</span>
+                  <span style={{ fontWeight: '500', color: '#f87171' }}>${tooltipData.low}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#9ca3af' }}>Close:</span>
+                  <span style={{ fontWeight: '500' }}>${tooltipData.close}</span>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

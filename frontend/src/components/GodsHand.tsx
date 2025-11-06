@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Zap, Play, StopCircle, AlertTriangle, Settings } from 'lucide-react';
 import { botAPI } from '../api';
 import { colors, typography } from '../theme/colors';
@@ -13,6 +14,7 @@ export default function GodsHand({ symbol }: GodsHandProps) {
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [balance, setBalance] = useState<any>(null);
   const [continuous, setContinuous] = useState<boolean>(() => {
     const saved = localStorage.getItem('godsHand.continuous');
     return saved ? saved === 'true' : true;
@@ -26,10 +28,12 @@ export default function GodsHand({ symbol }: GodsHandProps) {
   useEffect(() => {
     loadConfig();
     loadStatus();
+    loadBalance();
     
     // Auto-refresh status every 5 seconds
     const statusInterval = setInterval(() => {
       loadStatus();
+      loadBalance();
     }, 5000);
     
     return () => clearInterval(statusInterval);
@@ -66,6 +70,22 @@ export default function GodsHand({ symbol }: GodsHandProps) {
       setStatus(response.data);
     } catch (error) {
       console.error('Failed to load status');
+    }
+  };
+
+  const loadBalance = async () => {
+    try {
+      const response = await fetch('/api/account/balance?fiat_currency=USD', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setBalance(data);
+      }
+    } catch (error) {
+      console.error('Failed to load balance');
     }
   };
 
@@ -126,6 +146,114 @@ export default function GodsHand({ symbol }: GodsHandProps) {
       </div>
 
       <div className="grid grid-2" style={{ marginBottom: '20px' }}>
+        {/* Current Symbol Balance */}
+        {config && balance && (() => {
+          const baseCurrency = symbol.split('/')[0];
+          const quoteCurrency = symbol.split('/')[1] || 'USDT';
+          const baseAsset = balance.assets?.find((a: any) => a.asset === baseCurrency);
+          const quoteAsset = balance.assets?.find((a: any) => a.asset === quoteCurrency);
+          
+          return (
+            <div style={{ 
+              padding: '20px', 
+              background: `linear-gradient(135deg, ${colors.primary.sage}15 0%, ${colors.primary.coral}15 100%)`,
+              borderRadius: typography.borderRadius.md,
+              border: `2px solid ${colors.primary.sage}`,
+              boxShadow: colors.shadow.sm
+            }}>
+              <h3 style={{ 
+                marginBottom: '15px', 
+                fontSize: '1.1rem',
+                color: colors.text.primary,
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                💰 {symbol} Balance
+              </h3>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '12px'
+              }}>
+                {baseAsset ? (
+                  <div style={{
+                    padding: '12px',
+                    background: colors.background.card,
+                    borderRadius: '8px',
+                    border: `1px solid ${colors.border.default}`
+                  }}>
+                    <div style={{ fontSize: '0.75rem', color: colors.text.secondary, marginBottom: '4px' }}>
+                      {baseCurrency}
+                    </div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: colors.primary.sage, marginBottom: '2px' }}>
+                      {baseAsset.total.toFixed(8)}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: colors.text.muted }}>
+                      Free: {baseAsset.free.toFixed(8)}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{
+                    padding: '12px',
+                    background: colors.background.card,
+                    borderRadius: '8px',
+                    border: `1px solid ${colors.border.default}`,
+                    textAlign: 'center',
+                    color: colors.text.muted
+                  }}>
+                    <div style={{ fontSize: '0.75rem', marginBottom: '4px' }}>{baseCurrency}</div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>0.00000000</div>
+                  </div>
+                )}
+                {quoteAsset ? (
+                  <div style={{
+                    padding: '12px',
+                    background: colors.background.card,
+                    borderRadius: '8px',
+                    border: `1px solid ${colors.border.default}`
+                  }}>
+                    <div style={{ fontSize: '0.75rem', color: colors.text.secondary, marginBottom: '4px' }}>
+                      {quoteCurrency}
+                    </div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: colors.primary.coral, marginBottom: '2px' }}>
+                      {quoteAsset.total.toFixed(2)}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: colors.text.muted }}>
+                      Free: {quoteAsset.free.toFixed(2)}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{
+                    padding: '12px',
+                    background: colors.background.card,
+                    borderRadius: '8px',
+                    border: `1px solid ${colors.border.default}`,
+                    textAlign: 'center',
+                    color: colors.text.muted
+                  }}>
+                    <div style={{ fontSize: '0.75rem', marginBottom: '4px' }}>{quoteCurrency}</div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>0.00</div>
+                  </div>
+                )}
+              </div>
+              <div style={{ 
+                marginTop: '12px',
+                paddingTop: '12px',
+                borderTop: `1px solid ${colors.border.subtle}`,
+                fontSize: '0.85rem',
+                color: colors.text.secondary
+              }}>
+                Budget: <strong style={{ color: colors.primary.clay }}>${config.budget.toFixed(2)}</strong>
+                <span style={{ marginLeft: '12px' }}>
+                  {config.paper_trading ? '📝 PAPER' : '💰 REAL'}
+                </span>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Current Config */}
         {config && (
           <div style={{ 
@@ -145,23 +273,15 @@ export default function GodsHand({ symbol }: GodsHandProps) {
             </h3>
             <div style={{ fontSize: '0.95rem', lineHeight: '2', color: colors.text.secondary }}>
               <div>Symbol: <strong style={{ color: colors.text.primary }}>{config.symbol}</strong></div>
-              <div>Budget: <strong style={{ color: colors.primary.clay }}>${config.budget}</strong></div>
               <div>Risk Level: <strong style={{ color: colors.text.primary }}>{config.risk_level}</strong></div>
               <div>Min Confidence: <strong style={{ color: colors.text.primary }}>{(config.min_confidence * 100).toFixed(0)}%</strong></div>
-              <div>
-                Paper Trading: 
-                <strong style={{ 
-                  color: config.paper_trading ? colors.status.warning.color : colors.trading.buy.color,
-                  marginLeft: '8px'
-                }}>
-                  {config.paper_trading ? '📝 PAPER' : '💰 REAL'}
-                </strong>
-              </div>
+              <div>Entry Step: <strong style={{ color: colors.text.primary }}>{config.entry_step_percent}%</strong></div>
+              <div>Exit Step: <strong style={{ color: colors.text.primary }}>{config.exit_step_percent}%</strong></div>
             </div>
           </div>
         )}
 
-        {/* Last Result */}
+        {/* Last Result (moved to second row if both balance and config exist) */}
         {result && (
           <div style={{ 
             padding: '20px', 
@@ -286,7 +406,7 @@ export default function GodsHand({ symbol }: GodsHandProps) {
       )}
 
       {/* Settings Modal */}
-      {showSettings && (
+      {showSettings && createPortal(
         <GodsHandSettingsModal
           config={config}
           continuous={continuous}
@@ -307,7 +427,8 @@ export default function GodsHand({ symbol }: GodsHandProps) {
             localStorage.setItem('godsHand.continuous', String(cont));
             localStorage.setItem('godsHand.intervalSeconds', String(interval));
           }}
-        />
+        />,
+        document.body
       )}
     </div>
   );
@@ -328,21 +449,48 @@ function GodsHandSettingsModal({ config, onClose, onSave, onSaveRunSettings, con
     intervalSeconds: intervalSeconds || 60,
   });
 
+  const [resetting, setResetting] = useState(false);
+
+  const handleResetPaperTrading = async () => {
+    if (!confirm('⚠️ This will delete ALL paper trading history!\n\nAre you sure you want to reset?')) {
+      return;
+    }
+    
+    setResetting(true);
+    try {
+      const response = await botAPI.resetPaperTrading();
+      alert(`✅ ${response.data.message}\n\nDeleted ${response.data.deleted_trades} trades and ${response.data.deleted_snapshots} snapshots.`);
+    } catch (error: any) {
+      alert(`❌ Failed to reset: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setResetting(false);
+    }
+  };
+
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: colors.background.overlay,
-      backdropFilter: 'blur(8px)',
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      zIndex: 1000,
-      padding: '20px'
-    }}>
+    <div 
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: colors.background.overlay,
+        backdropFilter: 'blur(8px)',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 99999,
+        padding: '20px',
+        overflow: 'auto'
+      }}
+      onClick={(e) => {
+        // Close when clicking backdrop
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <div style={{
         background: `linear-gradient(135deg, ${colors.background.primary} 0%, ${colors.background.secondary} 100%)`,
         borderRadius: typography.borderRadius.xl,
@@ -351,7 +499,11 @@ function GodsHandSettingsModal({ config, onClose, onSave, onSaveRunSettings, con
         padding: '32px',
         boxShadow: colors.shadow.lg,
         border: `1px solid ${colors.border.default}`,
-      }}>
+        position: 'relative',
+        zIndex: 100000
+      }}
+      onClick={(e) => e.stopPropagation()}
+      >
         <h2 style={{ 
           margin: '0 0 24px 0', 
           fontSize: '1.8rem',
@@ -522,6 +674,51 @@ function GodsHandSettingsModal({ config, onClose, onSave, onSaveRunSettings, con
             </select>
           </div>
         </div>
+
+        {/* Reset Paper Trading */}
+        {settings.paper_trading && (
+          <div style={{
+            padding: '16px',
+            background: colors.status.warning.bg,
+            borderRadius: typography.borderRadius.md,
+            border: `2px solid ${colors.status.warning.border}`,
+            marginBottom: '20px'
+          }}>
+            <div style={{ 
+              color: colors.text.primary, 
+              fontWeight: 700, 
+              marginBottom: '8px',
+              fontSize: '1rem'
+            }}>
+              🔄 Reset Paper Trading
+            </div>
+            <div style={{ 
+              color: colors.text.secondary, 
+              fontSize: '0.9rem',
+              marginBottom: '12px'
+            }}>
+              Clear all paper trading history and start fresh. This cannot be undone.
+            </div>
+            <button
+              onClick={handleResetPaperTrading}
+              disabled={resetting}
+              style={{
+                width: '100%',
+                padding: '12px',
+                background: colors.status.error.bg,
+                color: colors.status.error.color,
+                border: `2px solid ${colors.status.error.border}`,
+                borderRadius: typography.borderRadius.md,
+                fontSize: '0.95rem',
+                fontWeight: 600,
+                cursor: resetting ? 'not-allowed' : 'pointer',
+                opacity: resetting ? 0.6 : 1
+              }}
+            >
+              {resetting ? '⏳ Resetting...' : '🗑️ Reset All Paper Trading Data'}
+            </button>
+          </div>
+        )}
 
         {/* Buttons */}
         <div style={{ display: 'flex', gap: '12px' }}>
