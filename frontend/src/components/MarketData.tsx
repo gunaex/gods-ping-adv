@@ -14,7 +14,21 @@ export default function MarketData({ symbol }: MarketDataProps) {
   const chartRef = useRef<any>(null);
   const seriesRef = useRef<any>(null);
 
+  // Load market data when symbol changes
   useEffect(() => {
+    const loadMarketData = async () => {
+      try {
+        const [tickerRes, candlesRes] = await Promise.all([
+          marketAPI.getTicker(symbol),
+          marketAPI.getCandles(symbol, '1h', 100),
+        ]);
+        setTicker(tickerRes.data);
+        setCandles(candlesRes.data.candles);
+      } catch (error) {
+        console.error('Failed to load market data:', error);
+      }
+    };
+
     loadMarketData();
     const interval = setInterval(loadMarketData, 10000); // Update every 10s
     return () => clearInterval(interval);
@@ -99,19 +113,6 @@ export default function MarketData({ symbol }: MarketDataProps) {
       console.warn('Chart update skipped:', e);
     }
   }, [candles]);
-
-  const loadMarketData = async () => {
-    try {
-      const [tickerRes, candlesRes] = await Promise.all([
-        marketAPI.getTicker(symbol),
-        marketAPI.getCandles(symbol, '1h', 100),
-      ]);
-      setTicker(tickerRes.data);
-      setCandles(candlesRes.data.candles);
-    } catch (error) {
-      console.error('Failed to load market data:', error);
-    }
-  };
 
   // Removed renderChart; chart lifecycle handled in effects above
 

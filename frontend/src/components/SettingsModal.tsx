@@ -103,23 +103,8 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
           <div style={{ marginBottom: '25px' }}>
             <h3 style={{ fontSize: '1.2rem', marginBottom: '15px' }}>Trading Settings</h3>
             
-            <div className="grid grid-2" style={{ marginBottom: '15px' }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9rem' }}>
-                  Trading Symbol
-                </label>
-                <select
-                  value={config.symbol}
-                  onChange={(e) => setConfig({...config, symbol: e.target.value})}
-                  style={{ width: '100%' }}
-                >
-                  <option value="BTC/USDT">BTC/USDT</option>
-                  <option value="ETH/USDT">ETH/USDT</option>
-                  <option value="BNB/USDT">BNB/USDT</option>
-                  <option value="SOL/USDT">SOL/USDT</option>
-                </select>
-              </div>
 
+            <div className="grid grid-2" style={{ marginBottom: '15px' }}>
               <div>
                 <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9rem' }}>
                   Fiat Currency
@@ -278,6 +263,50 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                 />
                 <div style={{ marginTop: '4px', fontSize: '0.75rem', opacity: 0.6 }}>
                   10% = exit position gradually (reduce risk)
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-2" style={{ marginBottom: '15px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9rem' }}>
+                  Trailing Take Profit (%)
+                  <span style={{ marginLeft: '8px', fontSize: '0.85rem', opacity: 0.7 }}>
+                    Lock in profits when price drops
+                  </span>
+                </label>
+                <input
+                  type="number"
+                  min="0.5"
+                  max="20"
+                  step="0.5"
+                  value={config.trailing_take_profit_percent || 2.5}
+                  onChange={(e) => setConfig({...config, trailing_take_profit_percent: parseFloat(e.target.value)})}
+                  style={{ width: '100%' }}
+                />
+                <div style={{ marginTop: '4px', fontSize: '0.75rem', opacity: 0.6 }}>
+                  Sell when profit ≥ {config.trailing_take_profit_percent || 2.5}%
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9rem' }}>
+                  Hard Stop Loss (%)
+                  <span style={{ marginLeft: '8px', fontSize: '0.85rem', opacity: 0.7 }}>
+                    Exit all if loss exceeds
+                  </span>
+                </label>
+                <input
+                  type="number"
+                  min="0.5"
+                  max="20"
+                  step="0.5"
+                  value={config.hard_stop_loss_percent || 3.0}
+                  onChange={(e) => setConfig({...config, hard_stop_loss_percent: parseFloat(e.target.value)})}
+                  style={{ width: '100%' }}
+                />
+                <div style={{ marginTop: '4px', fontSize: '0.75rem', opacity: 0.6 }}>
+                  Close position if loss ≥ {config.hard_stop_loss_percent || 3.0}%
                 </div>
               </div>
             </div>

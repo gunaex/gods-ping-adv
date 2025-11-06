@@ -62,6 +62,17 @@ try:
         print("✅ Added gmail_app_password")
         changes_made = True
     
+    # Add profit protection columns if missing
+    if 'trailing_take_profit_percent' not in columns:
+        cursor.execute("ALTER TABLE bot_configs ADD COLUMN trailing_take_profit_percent REAL DEFAULT 2.5")
+        print("✅ Added trailing_take_profit_percent")
+        changes_made = True
+    
+    if 'hard_stop_loss_percent' not in columns:
+        cursor.execute("ALTER TABLE bot_configs ADD COLUMN hard_stop_loss_percent REAL DEFAULT 3.0")
+        print("✅ Added hard_stop_loss_percent")
+        changes_made = True
+    
     if changes_made:
         conn.commit()
         print("✅ Migration complete!")

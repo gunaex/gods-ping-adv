@@ -26,7 +26,29 @@ export default function GodsHand({ symbol }: GodsHandProps) {
   useEffect(() => {
     loadConfig();
     loadStatus();
+    
+    // Auto-refresh status every 5 seconds
+    const statusInterval = setInterval(() => {
+      loadStatus();
+    }, 5000);
+    
+    return () => clearInterval(statusInterval);
   }, [symbol]);
+
+  // Sync symbol with Trading Pair Selector when bot is not running
+  useEffect(() => {
+    const syncSymbol = async () => {
+      if (config && symbol !== config.symbol && status?.gods_hand !== 'running') {
+        try {
+          await botAPI.updateConfig({ symbol: symbol });
+          await loadConfig(); // Reload to show updated symbol
+        } catch (error) {
+          console.error('Failed to sync symbol:', error);
+        }
+      }
+    };
+    syncSymbol();
+  }, [symbol, config?.symbol, status?.gods_hand]);
 
   const loadConfig = async () => {
     try {
@@ -40,6 +62,7 @@ export default function GodsHand({ symbol }: GodsHandProps) {
   const loadStatus = async () => {
     try {
       const response = await botAPI.getStatus();
+      console.log('Bot status response:', response.data);
       setStatus(response.data);
     } catch (error) {
       console.error('Failed to load status');
@@ -47,13 +70,23 @@ export default function GodsHand({ symbol }: GodsHandProps) {
   };
 
   const startGodsHand = async () => {
+    console.log('Starting Gods Hand...', { continuous, intervalSeconds });
     setLoading(true);
     try {
-      await botAPI.updateConfig({ gods_hand_enabled: true });
+      // Update symbol to match Trading Pair Selector before starting
+      console.log('Updating config with symbol:', symbol);
+      await botAPI.updateConfig({ 
+        gods_hand_enabled: true,
+        symbol: symbol  // Sync with Trading Pair Selector
+      });
+      console.log('Starting Gods Hand API call...');
       const response = await botAPI.startGodsHand(continuous, intervalSeconds);
+      console.log('Gods Hand started successfully:', response.data);
       setResult(response.data);
+      await loadConfig(); // Reload config to show updated symbol
       loadStatus();
     } catch (error: any) {
+      console.error('Error starting Gods Hand:', error);
       alert(error.response?.data?.detail || 'Failed to start Gods Hand');
     } finally {
       setLoading(false);
@@ -212,13 +245,18 @@ export default function GodsHand({ symbol }: GodsHandProps) {
         </div>
 
         <div style={{ display: 'flex', gap: '12px' }}>
-          <button onClick={startGodsHand} disabled={loading || status?.gods_hand === 'running'}>
+          <button 
+            onClick={startGodsHand} 
+            disabled={loading || status?.gods_hand === 'running'}
+            onMouseEnter={() => console.log('Execute Now - disabled?', loading || status?.gods_hand === 'running', 'status:', status?.gods_hand)}
+          >
             <Play size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
             Execute Now
           </button>
           <button 
             onClick={stopGodsHand} 
             disabled={status?.gods_hand !== 'running'}
+            onMouseEnter={() => console.log('Stop - disabled?', status?.gods_hand !== 'running', 'status:', status?.gods_hand)}
             style={{
               background: `linear-gradient(135deg, ${colors.status.error.color} 0%, ${colors.primary.warmRed} 100%)`,
             }}

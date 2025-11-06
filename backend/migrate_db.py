@@ -37,26 +37,31 @@ try:
     cursor.execute("PRAGMA table_info(bot_configs)")
     columns = [row[1] for row in cursor.fetchall()]
     
-    if 'entry_step_percent' in columns and 'exit_step_percent' in columns:
-        print("✅ Columns already exist! No migration needed.")
+    migrations_needed = []
+    
+    # Check all required columns
+    required_columns = {
+        'entry_step_percent': 10.0,
+        'exit_step_percent': 10.0,
+        'trailing_take_profit_percent': 2.5,
+        'hard_stop_loss_percent': 3.0
+    }
+    
+    for col_name, default_val in required_columns.items():
+        if col_name not in columns:
+            migrations_needed.append((col_name, default_val))
+    
+    if not migrations_needed:
+        print("✅ All columns already exist! No migration needed.")
     else:
-        print("🔧 Adding new columns to bot_configs table...")
+        print(f"🔧 Adding {len(migrations_needed)} new columns to bot_configs table...")
         
-        # Add entry_step_percent column
-        if 'entry_step_percent' not in columns:
-            cursor.execute("""
+        for col_name, default_val in migrations_needed:
+            cursor.execute(f"""
                 ALTER TABLE bot_configs 
-                ADD COLUMN entry_step_percent REAL DEFAULT 10.0
+                ADD COLUMN {col_name} REAL DEFAULT {default_val}
             """)
-            print("✅ Added entry_step_percent column (default: 10.0)")
-        
-        # Add exit_step_percent column
-        if 'exit_step_percent' not in columns:
-            cursor.execute("""
-                ALTER TABLE bot_configs 
-                ADD COLUMN exit_step_percent REAL DEFAULT 10.0
-            """)
-            print("✅ Added exit_step_percent column (default: 10.0)")
+            print(f"✅ Added {col_name} column (default: {default_val})")
         
         # Commit changes
         conn.commit()

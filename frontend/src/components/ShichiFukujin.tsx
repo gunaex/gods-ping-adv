@@ -11,6 +11,7 @@ import MarketData from './MarketData';
 import BotsPanel from './BotsPanel';
 import AdvancedAnalysis from './AdvancedAnalysis';
 import GodsHand from './GodsHand';
+import PaperTradingPerformance from './PaperTradingPerformance';
 import SettingsModal from './SettingsModal';
 import LogsModal from './LogsModal';
 import { formatLocalDateTime, getUserTimezone, getUTCOffset } from '../utils/timeUtils';
@@ -109,7 +110,7 @@ export default function ShichiFukujin() {
       <AccountBalance symbol={selectedSymbol} fiatCurrency={fiatCurrency} />
 
   {/* Section 4: Market Data & Chart */}
-  <MarketData symbol={selectedSymbol} />
+  <MarketData key={selectedSymbol} symbol={selectedSymbol} />
 
       <div className="grid grid-2">
         {/* Section 5: Grid Bot & DCA Bot */}
@@ -121,6 +122,9 @@ export default function ShichiFukujin() {
 
       {/* Section 7: Gods Hand */}
       <GodsHand symbol={selectedSymbol} />
+
+      {/* Section 8: Paper Trading Performance */}
+      <PaperTradingPerformance />
 
   {/* Logs Modal */}
       {showLogs && (

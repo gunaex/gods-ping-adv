@@ -85,6 +85,10 @@ class BotConfig(Base):
     entry_step_percent = Column(Float, default=10.0)  # % of position_size to buy per BUY signal
     exit_step_percent = Column(Float, default=10.0)   # % of position to sell per SELL signal
     
+    # Profit Protection
+    trailing_take_profit_percent = Column(Float, default=2.5)  # Trailing take profit %
+    hard_stop_loss_percent = Column(Float, default=3.0)  # Hard stop loss from cost basis %
+    
     # Grid Bot Settings
     grid_enabled = Column(Boolean, default=False)
     grid_lower_price = Column(Float, nullable=True)
@@ -128,6 +132,8 @@ class BotConfig(Base):
             'max_daily_loss': self.max_daily_loss,
             'entry_step_percent': self.entry_step_percent,
             'exit_step_percent': self.exit_step_percent,
+            'trailing_take_profit_percent': self.trailing_take_profit_percent,
+            'hard_stop_loss_percent': self.hard_stop_loss_percent,
             'grid_enabled': self.grid_enabled,
             'grid_lower_price': self.grid_lower_price,
             'grid_upper_price': self.grid_upper_price,

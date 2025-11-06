@@ -67,6 +67,8 @@ class UpdateBotConfigRequest(BaseModel):
     max_daily_loss: Optional[float] = None
     entry_step_percent: Optional[float] = None
     exit_step_percent: Optional[float] = None
+    trailing_take_profit_percent: Optional[float] = None
+    hard_stop_loss_percent: Optional[float] = None
     grid_enabled: Optional[bool] = None
     grid_lower_price: Optional[float] = None
     grid_upper_price: Optional[float] = None
@@ -604,6 +606,10 @@ async def start_gods_hand(
     Returns result of first run and continues in background if continuous=True.
     """
     from app.bots import start_gods_hand_entry
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    logger.info(f"Starting Gods Hand - continuous={continuous}, interval={interval_seconds}")
 
     # Validate interval bounds
     if interval_seconds < 10:
@@ -612,6 +618,8 @@ async def start_gods_hand(
         interval_seconds = 3600
 
     result = await start_gods_hand_entry(current_user["id"], db, continuous=continuous, interval_seconds=interval_seconds)
+    logger.info(f"Gods Hand start result: {result}")
+    
     if result.get("status") == "error":
         raise HTTPException(status_code=400, detail=result.get("message", "Failed to start Gods Hand"))
     return result
@@ -640,6 +648,77 @@ async def get_bot_status(
     
     status = await check_status(current_user["id"], db)
     return status
+
+
+@app.get("/api/bot/gods-hand/debug")
+async def gods_hand_debug(
+    current_user: dict = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Debug Gods Hand bot - check status, recent logs, and position"""
+    from app.bots import bot_status, bot_tasks
+    from app.logging_models import Log
+    from app.position_tracker import get_current_position
+    from datetime import datetime, timedelta
+    
+    user_id = current_user["id"]
+    bot_key = f"gods_hand_{user_id}"
+    
+    # Get config
+    config = db.query(BotConfig).filter(BotConfig.user_id == user_id).first()
+    if not config:
+        return {"error": "No config found"}
+    
+    # Get current position
+    position = get_current_position(user_id, config.symbol, db)
+    
+    # Get recent AI logs (last 10)
+    recent_logs = db.query(Log).filter(
+        Log.user_id == user_id,
+        Log.bot_type == 'gods_hand'
+    ).order_by(Log.timestamp.desc()).limit(10).all()
+    
+    # Get recent trades (last 5)
+    recent_trades = db.query(Trade).filter(
+        Trade.user_id == user_id,
+        Trade.bot_type == 'gods_hand'
+    ).order_by(Trade.timestamp.desc()).limit(5).all()
+    
+    return {
+        "bot_status": bot_status.get(bot_key, "not_found"),
+        "task_exists": bot_key in bot_tasks,
+        "task_done": bot_tasks[bot_key].done() if bot_key in bot_tasks else None,
+        "config": {
+            "symbol": config.symbol,
+            "gods_hand_enabled": config.gods_hand_enabled,
+            "min_confidence": config.min_confidence,
+            "entry_step_percent": config.entry_step_percent,
+            "exit_step_percent": config.exit_step_percent,
+            "paper_trading": config.paper_trading,
+            "max_daily_loss": config.max_daily_loss
+        },
+        "position": position,
+        "recent_logs": [
+            {
+                "timestamp": log.timestamp.isoformat(),
+                "category": log.category.value if log.category else None,
+                "level": log.level.value if log.level else None,
+                "message": log.message,
+                "ai_recommendation": log.ai_recommendation,
+                "ai_confidence": log.ai_confidence,
+                "ai_executed": log.ai_executed
+            } for log in recent_logs
+        ],
+        "recent_trades": [
+            {
+                "timestamp": trade.timestamp.isoformat(),
+                "side": trade.side,
+                "amount": trade.amount,
+                "price": trade.price,
+                "status": trade.status
+            } for trade in recent_trades
+        ]
+    }
 
 
 # ----------------------------------------------------------------------------
@@ -907,6 +986,65 @@ async def clear_logs(
         "message": f"Deleted {deleted_count} log entries",
         "category": category if category else "all"
     }
+
+
+# Paper Trading Performance
+@app.get("/api/paper-trading/performance")
+async def get_paper_performance(
+    symbol: Optional[str] = None,
+    bot_type: str = "gods_hand",
+    current_user: dict = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get current paper trading performance"""
+    from app.paper_trading_tracker import calculate_paper_performance
+    
+    # Get symbol from config if not provided
+    if not symbol:
+        config = db.query(BotConfig).filter(BotConfig.user_id == current_user["id"]).first()
+        symbol = config.symbol if config else "BTC/USDT"
+    
+    perf = calculate_paper_performance(current_user["id"], symbol, bot_type, db)
+    return perf if perf else {"error": "No data available"}
+
+
+@app.get("/api/paper-trading/history")
+async def get_paper_history(
+    symbol: Optional[str] = None,
+    bot_type: str = "gods_hand",
+    days: int = 7,
+    current_user: dict = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get paper trading performance history (default 7 days)"""
+    from app.paper_trading_tracker import get_paper_performance_history
+    
+    # Get symbol from config if not provided
+    if not symbol:
+        config = db.query(BotConfig).filter(BotConfig.user_id == current_user["id"]).first()
+        symbol = config.symbol if config else "BTC/USDT"
+    
+    history = get_paper_performance_history(current_user["id"], symbol, bot_type, days, db)
+    return {"history": history, "symbol": symbol, "bot_type": bot_type, "days": days}
+
+
+@app.post("/api/paper-trading/snapshot")
+async def create_paper_snapshot(
+    symbol: Optional[str] = None,
+    bot_type: str = "gods_hand",
+    current_user: dict = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Manually create a paper trading performance snapshot"""
+    from app.paper_trading_tracker import save_paper_snapshot
+    
+    # Get symbol from config if not provided
+    if not symbol:
+        config = db.query(BotConfig).filter(BotConfig.user_id == current_user["id"]).first()
+        symbol = config.symbol if config else "BTC/USDT"
+    
+    snapshot = save_paper_snapshot(current_user["id"], symbol, bot_type, db)
+    return {"status": "success", "snapshot": snapshot}
 
 
 if __name__ == "__main__":
