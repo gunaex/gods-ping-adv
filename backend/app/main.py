@@ -652,6 +652,19 @@ async def get_forecast_history(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/market/forecast/history/{base}/{quote}")
+async def get_forecast_history_pair(
+    base: str,
+    quote: str,
+    limit: int = 5,
+    current_user: dict = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Pair form (BTC/USDT) convenience wrapper for history endpoint; avoids needing URL encoding of '/'."""
+    symbol = f"{base}/{quote}"
+    return await get_forecast_history(symbol, limit, current_user, db)
+
+
 # Account Balance
 @app.get("/api/account/balance")
 async def get_balance(
