@@ -516,6 +516,7 @@ async def get_price_forecast(
         try:
             from app.models import ForecastSnapshot
             import json
+            from datetime import timedelta
             snapshot = ForecastSnapshot(
                 symbol=symbol,
                 horizon_hours=forecast_hours,
@@ -529,6 +530,14 @@ async def get_price_forecast(
             )
             db.add(snapshot)
             db.commit()
+
+            # Retention pruning: delete snapshots older than 30 days
+            try:
+                cutoff = datetime.utcnow() - timedelta(days=30)
+                db.query(ForecastSnapshot).filter(ForecastSnapshot.generated_at < cutoff).delete()
+                db.commit()
+            except Exception as prune_err:
+                print(f"[WARN] Failed to prune old snapshots: {prune_err}")
         except Exception as persist_err:
             # Log but don't fail the main request
             print(f"[WARN] Failed to persist forecast snapshot: {persist_err}")
@@ -563,6 +572,8 @@ async def get_forecast_history(
     """Return recent persisted forecast snapshots for a symbol (limited)."""
     from app.models import ForecastSnapshot
     import json
+    from app.market import get_candlestick_data
+    import math
     try:
         q = db.query(ForecastSnapshot).filter(ForecastSnapshot.symbol == symbol).order_by(ForecastSnapshot.generated_at.desc()).limit(limit)
         rows = q.all()
@@ -573,7 +584,7 @@ async def get_forecast_history(
                 data = json.loads(r.data_json)
             except Exception:
                 pass
-            history.append({
+            item = {
                 'id': r.id,
                 'symbol': r.symbol,
                 'generated_at': r.generated_at.isoformat() if r.generated_at else None,
@@ -583,7 +594,59 @@ async def get_forecast_history(
                 'forecasts': data.get('forecasts', []),
                 'price_targets': data.get('price_targets'),
                 'risk_metrics': data.get('risk_metrics'),
-            })
+            }
+
+            # Compute evaluation metrics (MAE/MAPE) if horizon elapsed and data available
+            try:
+                forecasts = item['forecasts']
+                if forecasts and r.generated_at and r.horizon_hours:
+                    end_time = r.generated_at.timestamp() + r.horizon_hours * 3600
+                    now_ts = datetime.utcnow().timestamp()
+                    # Only evaluate if horizon fully elapsed and snapshot not too old (> 200h ago)
+                    if now_ts >= end_time:
+                        # Fetch last 200 hourly candles
+                        candles = await get_candlestick_data(symbol, timeframe='1h', limit=200)
+                        # Build map by hour timestamp (sec)
+                        candle_map = { int(c['timestamp'] / 1000): c for c in candles }
+                        abs_errors = []
+                        pct_errors = []
+                        for f in forecasts:
+                            hour = f.get('hour')
+                            pred = f.get('predicted_price') or f.get('value') or f.get('price')
+                            if hour is None or pred is None:
+                                continue
+                            ts = int(r.generated_at.timestamp()) + int(hour) * 3600
+                            # Find nearest candle within ±30min
+                            candidates = [ts, ts-3600, ts+3600]
+                            actual = None
+                            for cand_ts in candidates:
+                                c = candle_map.get(cand_ts)
+                                if c:
+                                    actual = c.get('close')
+                                    break
+                            if actual and actual > 0:
+                                abs_errors.append(abs(pred - actual))
+                                pct_errors.append(abs(pred - actual) / actual)
+                        if abs_errors:
+                            mae = sum(abs_errors) / len(abs_errors)
+                            mape = sum(pct_errors) / len(pct_errors)
+                            item['metrics'] = {
+                                'mae': mae,
+                                'mape': mape,
+                                'n': len(abs_errors),
+                                'evaluated': True,
+                            }
+                        else:
+                            item['metrics'] = { 'evaluated': False }
+                    else:
+                        item['metrics'] = { 'evaluated': False }
+                else:
+                    item['metrics'] = { 'evaluated': False }
+            except Exception as eval_err:
+                print(f"[WARN] Forecast evaluation failed: {eval_err}")
+                item['metrics'] = { 'evaluated': False }
+
+            history.append(item)
         return {'symbol': symbol, 'count': len(history), 'history': history}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

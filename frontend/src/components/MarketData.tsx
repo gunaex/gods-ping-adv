@@ -14,6 +14,7 @@ export default function MarketData({ symbol }: MarketDataProps) {
   const [historicalForecasts, setHistoricalForecasts] = useState<any[]>([]);
   const historicalSeriesRefs = useRef<any[]>([]);
   const [showForecast, setShowForecast] = useState(true);
+   const [showHistorical, setShowHistorical] = useState(true);
   const [tooltipData, setTooltipData] = useState<any>(null);
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
@@ -100,17 +101,19 @@ export default function MarketData({ symbol }: MarketDataProps) {
     historicalSeriesRefs.current = [];
 
     // Add series for historical forecasts (faint, thinner)
-  historicalForecasts.forEach((_hf, idx) => {
-      const series = chart.addLineSeries({
-        color: 'rgba(74,144,226,0.35)',
-        lineWidth: 1,
-        lineStyle: 2,
-        priceLineVisible: false,
-        lastValueVisible: false,
-        title: `Past Forecast ${idx+1}`,
-      });
-      historicalSeriesRefs.current.push(series);
-    });
+     if (showHistorical) {
+       historicalForecasts.forEach((_hf, idx) => {
+         const series = chart.addLineSeries({
+           color: 'rgba(74,144,226,0.35)',
+           lineWidth: 1,
+           lineStyle: 2,
+           priceLineVisible: false,
+           lastValueVisible: false,
+           title: `Past Forecast ${idx+1}`,
+         });
+         historicalSeriesRefs.current.push(series);
+       });
+     }
 
     chartRef.current = chart;
     seriesRef.current = candlestickSeries;
@@ -249,7 +252,7 @@ export default function MarketData({ symbol }: MarketDataProps) {
       forecastSeriesRef.current.setData(forecastData);
 
       // Historical forecasts plotting
-      if (historicalSeriesRefs.current.length && historicalForecasts.length) {
+      if (showHistorical && historicalSeriesRefs.current.length && historicalForecasts.length) {
         historicalForecasts.forEach((hf, i) => {
           const series = historicalSeriesRefs.current[i];
           if (!series) return;
@@ -308,6 +311,26 @@ export default function MarketData({ symbol }: MarketDataProps) {
           >
             <TrendingUp size={16} />
             {showForecast ? 'Hide Forecast' : 'Show Forecast'}
+          </button>
+          
+          <button
+            onClick={() => setShowHistorical(!showHistorical)}
+            style={{
+              padding: '8px 16px',
+              background: showHistorical ? 'rgba(74,144,226,0.4)' : 'rgba(255, 255, 255, 0.1)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              borderRadius: '6px',
+              color: '#fff',
+              cursor: 'pointer',
+              fontSize: '0.85rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.2s',
+            }}
+            title="Toggle historical forecasts"
+          >
+            {showHistorical ? 'Hide History' : 'Show History'}
           </button>
           
           <button
@@ -384,6 +407,57 @@ export default function MarketData({ symbol }: MarketDataProps) {
       )}
 
       <div style={{ position: 'relative' }}>
+          {/* Historical Forecast Metrics */}
+          {showHistorical && historicalForecasts.length > 0 && (
+            <div style={{
+              marginTop: '20px',
+              background: 'rgba(0,0,0,0.25)',
+              borderRadius: '8px',
+              padding: '15px'
+            }}>
+              <div style={{
+                fontSize: '0.95rem',
+                fontWeight: 'bold',
+                marginBottom: '10px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <span>Historical Forecast Accuracy</span>
+                <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>MAE = avg absolute error | MAPE = avg % error</span>
+              </div>
+              <div style={{ display: 'grid', gap: '8px' }}>
+                {historicalForecasts.map((hf, idx) => {
+                  const metrics = hf.metrics || { evaluated: false };
+                  return (
+                    <div key={hf.id || idx} style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      background: 'rgba(255,255,255,0.04)',
+                      padding: '8px 12px',
+                      borderRadius: '6px'
+                    }}>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '0.8rem', opacity: 0.7 }}>Snapshot {idx + 1}</span>
+                        <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>{new Date(hf.generated_at).toLocaleString()}</span>
+                      </div>
+                      {metrics.evaluated ? (
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '0.8rem' }}>MAE: <strong>${metrics.mae.toFixed(2)}</strong></div>
+                          <div style={{ fontSize: '0.8rem' }}>MAPE: <strong>{(metrics.mape * 100).toFixed(1)}%</strong></div>
+                          <div style={{ fontSize: '0.65rem', opacity: 0.5 }}>n={metrics.n}</div>
+                        </div>
+                      ) : (
+                        <div style={{ textAlign: 'right', fontSize: '0.75rem', opacity: 0.6 }}>
+                          Horizon pending
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         <div ref={chartContainerRef} className="chart-container" />
         
         {/* Tooltip overlay */}
