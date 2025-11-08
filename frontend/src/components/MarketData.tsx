@@ -11,6 +11,8 @@ export default function MarketData({ symbol }: MarketDataProps) {
   const [ticker, setTicker] = useState<any>(null);
   const [candles, setCandles] = useState<any[]>([]);
   const [forecast, setForecast] = useState<any>(null);
+  const [historicalForecasts, setHistoricalForecasts] = useState<any[]>([]);
+  const historicalSeriesRefs = useRef<any[]>([]);
   const [showForecast, setShowForecast] = useState(true);
   const [tooltipData, setTooltipData] = useState<any>(null);
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -23,14 +25,16 @@ export default function MarketData({ symbol }: MarketDataProps) {
   useEffect(() => {
     const loadMarketData = async () => {
       try {
-        const [tickerRes, candlesRes, forecastRes] = await Promise.all([
+        const [tickerRes, candlesRes, forecastRes, historyRes] = await Promise.all([
           marketAPI.getTicker(symbol),
           marketAPI.getCandles(symbol, '1h', 100),
           marketAPI.getForecast(symbol, 6),
+          marketAPI.getForecastHistory(symbol, 5),
         ]);
         setTicker(tickerRes.data);
         setCandles(candlesRes.data.candles);
         setForecast(forecastRes.data);
+        setHistoricalForecasts(historyRes.data.history || []);
       } catch (error) {
         console.error('Failed to load market data:', error);
       }
@@ -90,6 +94,22 @@ export default function MarketData({ symbol }: MarketDataProps) {
       priceLineVisible: false,
       lastValueVisible: true,
       title: 'Forecast',
+    });
+    // Clear any old historical series
+    historicalSeriesRefs.current.forEach(s => { try { chart.removeSeries(s); } catch {} });
+    historicalSeriesRefs.current = [];
+
+    // Add series for historical forecasts (faint, thinner)
+  historicalForecasts.forEach((_hf, idx) => {
+      const series = chart.addLineSeries({
+        color: 'rgba(74,144,226,0.35)',
+        lineWidth: 1,
+        lineStyle: 2,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        title: `Past Forecast ${idx+1}`,
+      });
+      historicalSeriesRefs.current.push(series);
     });
 
     chartRef.current = chart;
@@ -163,7 +183,7 @@ export default function MarketData({ symbol }: MarketDataProps) {
         seriesRef.current = null;
       }
     };
-  }, [symbol]);
+  }, [symbol, historicalForecasts]);
 
   // Update series data when candles change
   useEffect(() => {
@@ -184,7 +204,7 @@ export default function MarketData({ symbol }: MarketDataProps) {
     }
   }, [candles]);
 
-  // Update forecast line when forecast data changes
+  // Update forecast line + historical overlays when forecast data changes
   useEffect(() => {
     if (!forecastSeriesRef.current || !forecast || !showForecast) {
       // Hide forecast line if disabled
@@ -228,6 +248,25 @@ export default function MarketData({ symbol }: MarketDataProps) {
 
       forecastSeriesRef.current.setData(forecastData);
 
+      // Historical forecasts plotting
+      if (historicalSeriesRefs.current.length && historicalForecasts.length) {
+        historicalForecasts.forEach((hf, i) => {
+          const series = historicalSeriesRefs.current[i];
+          if (!series) return;
+          const genTime = new Date(hf.generated_at).getTime() / 1000;
+          const points = (hf.forecasts || []).map((p: any) => {
+            const ts = p.timestamp ? (typeof p.timestamp === 'number' ? p.timestamp : Date.parse(p.timestamp)/1000) : genTime + (p.hour ?? 0) * 3600;
+            return { time: ts, value: p.predicted_price ?? p.value ?? p.price };
+          }).filter((p: any) => typeof p.time === 'number' && typeof p.value === 'number');
+          if (points.length) {
+            const startPoint = { time: genTime, value: hf.current_price ?? points[0].value };
+            series.setData([startPoint, ...points]);
+          } else {
+            series.setData([]);
+          }
+        });
+      }
+
       // Ensure the future points are visible by extending the visible range
       const firstCandleTime = candles[0]?.timestamp ? candles[0].timestamp / 1000 : currentTime - 100 * 3600;
       const lastForecastTime = forecastData[forecastData.length - 1]?.time ?? currentTime;
@@ -237,7 +276,7 @@ export default function MarketData({ symbol }: MarketDataProps) {
     } catch (e) {
       console.warn('Forecast update skipped:', e);
     }
-  }, [forecast, candles, showForecast]);
+  }, [forecast, candles, showForecast, historicalForecasts]);
 
   // Removed renderChart; chart lifecycle handled in effects above
 
@@ -274,8 +313,12 @@ export default function MarketData({ symbol }: MarketDataProps) {
           <button
             onClick={async () => {
               try {
-                const forecastRes = await marketAPI.getForecast(symbol, 6);
+                const [forecastRes, historyRes] = await Promise.all([
+                  marketAPI.getForecast(symbol, 6),
+                  marketAPI.getForecastHistory(symbol, 5),
+                ]);
                 setForecast(forecastRes.data);
+                setHistoricalForecasts(historyRes.data.history || []);
               } catch (error) {
                 console.error('Failed to refresh forecast:', error);
               }

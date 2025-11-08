@@ -150,3 +150,28 @@ class BotConfig(Base):
             'gmail_app_password': '***' if self.gmail_app_password else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
+
+
+class ForecastSnapshot(Base):
+    """Persisted forecast results for historical comparison on chart"""
+    __tablename__ = "forecast_snapshots"
+
+    id = Column(Integer, primary_key=True, index=True)
+    symbol = Column(String, index=True, nullable=False)
+    generated_at = Column(DateTime, default=datetime.utcnow, index=True)
+    horizon_hours = Column(Integer, default=6)
+    current_price = Column(Float, nullable=False)
+    summary = Column(Text, nullable=True)
+    # Store forecasts (array of {hour, predicted_price, confidence}) and any extra fields
+    data_json = Column(Text, nullable=False)  # JSON string
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'symbol': self.symbol,
+            'generated_at': self.generated_at.isoformat() if self.generated_at else None,
+            'horizon_hours': self.horizon_hours,
+            'current_price': self.current_price,
+            'summary': self.summary,
+            'data': self.data_json,
+        }

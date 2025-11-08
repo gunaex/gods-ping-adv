@@ -12,7 +12,7 @@ from pydantic import BaseModel
 import time
 
 from app.db import engine, get_db, Base
-from app.models import User, Trade, BotConfig
+from app.models import User, Trade, BotConfig, ForecastSnapshot
 from app.logging_models import Log, LogCategory, LogLevel
 # Ensure all ORM models are imported before creating tables
 from app.paper_trading_tracker import PaperTradingSnapshot
@@ -489,7 +489,8 @@ async def get_orderbook(symbol: str, limit: int = 20):
 async def get_price_forecast(
     symbol: str,
     forecast_hours: int = 6,
-    current_user: dict = Depends(get_current_active_user)
+    current_user: dict = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
 ):
     """
     Get AI-powered price forecast for next N hours.
@@ -507,10 +508,31 @@ async def get_price_forecast(
         
         # Generate forecast
         forecast = forecast_price_hourly(candles, forecast_hours=forecast_hours)
-        
+
         # Add summary text
         forecast['summary'] = get_forecast_summary(forecast)
-        
+
+        # Persist snapshot for historical comparison
+        try:
+            from app.models import ForecastSnapshot
+            import json
+            snapshot = ForecastSnapshot(
+                symbol=symbol,
+                horizon_hours=forecast_hours,
+                current_price=forecast.get('current_price', candles[-1]['close'] if candles else 0.0),
+                summary=forecast.get('summary'),
+                data_json=json.dumps({
+                    'forecasts': forecast.get('forecasts') or forecast.get('forecast') or forecast.get('predictions') or [],
+                    'risk_metrics': forecast.get('risk_metrics'),
+                    'price_targets': forecast.get('price_targets'),
+                })
+            )
+            db.add(snapshot)
+            db.commit()
+        except Exception as persist_err:
+            # Log but don't fail the main request
+            print(f"[WARN] Failed to persist forecast snapshot: {persist_err}")
+
         return forecast
     except HTTPException:
         raise
@@ -523,11 +545,48 @@ async def get_price_forecast_pair(
     base: str,
     quote: str,
     forecast_hours: int = 6,
-    current_user: dict = Depends(get_current_active_user)
+    current_user: dict = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
 ):
     """Get price forecast for a trading pair (e.g., BTC/USDT)"""
     symbol = f"{base}/{quote}"
-    return await get_price_forecast(symbol, forecast_hours, current_user)
+    return await get_price_forecast(symbol, forecast_hours, current_user, db)
+
+
+@app.get("/api/market/forecast/history/{symbol}")
+async def get_forecast_history(
+    symbol: str,
+    limit: int = 5,
+    current_user: dict = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Return recent persisted forecast snapshots for a symbol (limited)."""
+    from app.models import ForecastSnapshot
+    import json
+    try:
+        q = db.query(ForecastSnapshot).filter(ForecastSnapshot.symbol == symbol).order_by(ForecastSnapshot.generated_at.desc()).limit(limit)
+        rows = q.all()
+        history = []
+        for r in rows:
+            data = {}
+            try:
+                data = json.loads(r.data_json)
+            except Exception:
+                pass
+            history.append({
+                'id': r.id,
+                'symbol': r.symbol,
+                'generated_at': r.generated_at.isoformat() if r.generated_at else None,
+                'horizon_hours': r.horizon_hours,
+                'current_price': r.current_price,
+                'summary': r.summary,
+                'forecasts': data.get('forecasts', []),
+                'price_targets': data.get('price_targets'),
+                'risk_metrics': data.get('risk_metrics'),
+            })
+        return {'symbol': symbol, 'count': len(history), 'history': history}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # Account Balance

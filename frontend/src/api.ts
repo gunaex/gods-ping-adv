@@ -46,6 +46,8 @@ export const marketAPI = {
   
   getForecast: (symbol: string, forecastHours: number = 6) =>
     api.get(`/market/forecast/${symbol}`, { params: { forecast_hours: forecastHours } }),
+  getForecastHistory: (symbol: string, limit: number = 5) =>
+    api.get(`/market/forecast/history/${symbol}`, { params: { limit } }),
 };
 
 export const aiAPI = {
