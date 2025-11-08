@@ -14,20 +14,27 @@ import time
 from app.db import engine, get_db, Base
 from app.models import User, Trade, BotConfig
 from app.logging_models import Log, LogCategory, LogLevel
+# Ensure all ORM models are imported before creating tables
+from app.paper_trading_tracker import PaperTradingSnapshot
 from app.auth import (
     verify_password, get_password_hash, create_access_token, create_refresh_token,
     get_current_active_user, ensure_admin_exists, ADMIN_USERNAME,
     encrypt_api_key, decrypt_api_key
 )
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
+# Create database tables on startup (after all models are imported)
 
 app = FastAPI(
     title="Gods Ping API",
     description="Shichi-Fukujin Trading Platform",
     version="1.0.0"
 )
+
+# Ensure DB tables exist once app starts
+@app.on_event("startup")
+def init_db():
+    # Importing models above ensures SQLAlchemy knows all tables
+    Base.metadata.create_all(bind=engine)
 
 # CORS - Read from environment variable
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000")
