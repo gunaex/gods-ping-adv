@@ -276,23 +276,28 @@ async def gods_hand_once(user_id: int, config: BotConfig, db: Session) -> dict:
     buy_signals = sum(1 for s in signal_breakdown if 'BUY' in s)
     sell_signals = sum(1 for s in signal_breakdown if 'SELL' in s)
     hold_signals = sum(1 for s in signal_breakdown if 'HOLD' in s and 'BUY' not in s and 'SELL' not in s)
-    
-    decision_summary = f"""AI DECISION CALCULATION for {symbol}
 
--- AI Recommendation: {action} @{confidence}
-   Signals analyzed: {len(signal_breakdown)}
-   {chr(10).join(['   • ' + s for s in signal_breakdown[:5]])}  # Show first 5
+    # Derive position metrics safely (keys may not exist yet in early cycles)
+    max_pos = float(max_position_size or 0.0)
+    current_val = float(current_position.get('position_value_usd', 0.0))
+    fill_percent = (current_val / max_pos * 100) if max_pos > 0 else 0.0
+    available_to_add = max(0.0, max_pos - current_val)
+    step_amount = float(incremental_calc.get('step_amount_usd', incremental_calc.get('suggested_amount_usd', 0.0)))
 
--- Confidence: BUY={buy_signals}, SELL={sell_signals}, HOLD={hold_signals}
-   - Confidence: {confidence:.3f} (average of {len(signal_breakdown)} factors)
-
-Final Decision: {action} @ {confidence:.0%} confidence
-
--- Position Setup for {symbol}:
-   - Max Position Size: ${current_position['max_position_value']:.2f}
-   - Current Held: ${current_position['position_value']:.2f} ({current_position['position_fill_percent']:.1f}%)
-   - Available: ${current_position['available_to_add']:.2f}
-   - Incremental Trade: ${incremental_calc['suggested_amount_usd']:.2f}"""
+    decision_summary = (
+        f"AI DECISION CALCULATION for {symbol}\n\n"
+        f"-- AI Recommendation: {action} @{confidence:.2f}\n"
+        f"   Signals analyzed: {len(signal_breakdown)}\n"
+        + ("".join([f"   • {s}\n" for s in signal_breakdown[:5]]) or "   • (no signals logged)\n")
+        + f"\n-- Confidence: BUY={buy_signals}, SELL={sell_signals}, HOLD={hold_signals}\n"
+        f"   - Confidence: {confidence:.3f} (average of {len(signal_breakdown)} factors)\n\n"
+        f"Final Decision: {action} @ {confidence:.0%} confidence\n\n"
+        f"-- Position Setup for {symbol}:\n"
+        f"   - Max Position Size: ${max_pos:.2f}\n"
+        f"   - Current Held (cost basis value): ${current_val:.2f} ({fill_percent:.1f}%)\n"
+        f"   - Available Capacity: ${available_to_add:.2f}\n"
+        f"   - Incremental Trade (step): ${step_amount:.2f}\n"
+    )
 
     # Log AI thinking with position info
     thinking_log = Log(
