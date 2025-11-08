@@ -36,21 +36,32 @@
    - **Name:** `gods-ping-backend`
    - **Region:** Singapore (or closest to you)
    - **Branch:** `main`
-   - **Root Directory:** `backend`
+   - **Root Directory:** Leave blank (or set to `/`)
    - **Environment:** `Python 3`
-   - **Build Command:** `pip install -r requirements.txt`
-   - **Start Command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+   - **Build Command:** `cd backend && pip install -r requirements.txt`
+   - **Start Command:** `cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 
 4. **Set Environment Variables:**
    
-   Click **"Advanced"** → **"Add Environment Variable"**:
+   **Option 1: Use the Secret Generator (Recommended)**
+   
+   Run the included script to generate all secrets at once:
+   ```bash
+   python generate_secrets.py
+   ```
+   
+   Copy the output and paste each variable into Render.
+   
+   **Option 2: Manual Generation**
+   
+   Click **"Advanced"** → **"Add Environment Variable"** and add each:
    
    ```
    SECRET_KEY = [Generate random 32-char string]
    ALGORITHM = HS256
    ACCESS_TOKEN_EXPIRE_MINUTES = 43200
    ENCRYPTION_KEY = [Generate random 32-char base64 string]
-   CORS_ORIGINS = https://your-frontend.vercel.app
+   CORS_ORIGINS = https://your-frontend.vercel.app,http://localhost:5173
    ```
 
    **Generate SECRET_KEY:**
@@ -64,6 +75,8 @@
    from cryptography.fernet import Fernet
    print(Fernet.generate_key().decode())
    ```
+   
+   > **Note:** After deploying frontend, update `CORS_ORIGINS` with your actual Vercel URL
 
 5. **Deploy:**
    - Click **"Create Web Service"**
@@ -74,55 +87,56 @@
 
 ## 🎨 Frontend Deployment (Vercel)
 
-### Step 1: Update API URL
-
-1. **Edit `frontend/vite.config.ts`:**
-   ```typescript
-   export default defineConfig({
-     server: {
-       proxy: {
-         '/api': {
-           target: 'https://gods-ping-backend.onrender.com', // Your Render URL
-           changeOrigin: true,
-         }
-       }
-     }
-   })
-   ```
-
-2. **Or use environment variable:**
-   
-   Create `frontend/.env.production`:
-   ```
-   VITE_API_URL=https://gods-ping-backend.onrender.com
-   ```
-
-### Step 2: Deploy on Vercel
+### Step 1: Deploy on Vercel (No code changes needed!)
 
 1. **Go to Vercel Dashboard:**
    - Visit https://vercel.com/new
-   - Click **"Import Project"**
+   - Click **"Import Project"** or **"Add New..."** → **"Project"**
 
 2. **Connect Repository:**
-   - Connect GitHub account
+   - Connect GitHub account if not already connected
    - Select `gods-ping` repository
    - Click **"Import"**
 
 3. **Configure Project:**
-   - **Framework Preset:** Vite
-   - **Root Directory:** `frontend`
-   - **Build Command:** `npm run build`
-   - **Output Directory:** `dist`
+   
+   **IMPORTANT - Follow these exact settings:**
+   
+   - **Framework Preset:** Vite (auto-detected)
+   - **Root Directory:** `frontend` ⚠️ **Click Edit** and type `frontend`
+   - **Build Command:** `npm run build` (default is fine)
+   - **Output Directory:** `dist` (default is fine)
+   - **Install Command:** `npm install` (default is fine)
 
 4. **Set Environment Variables:**
-   ```
-   VITE_API_URL = https://gods-ping-backend.onrender.com
-   ```
+   
+   Click **"Environment Variables"** and add:
+   
+   ⚠️ **IMPORTANT:** Enter the value directly, do NOT use "Secret" option!
+   
+   - **Key:** `VITE_API_URL`
+   - **Value:** `https://gods-ping-backend.onrender.com` (paste directly)
+   - **Environments:** Check all three boxes ✓ Production ✓ Preview ✓ Development
+   - Click **"Add"**
+   
+   **Common mistake:** If you see an error about "Secret api-url does not exist", delete the variable and add it again, making sure to paste the URL directly in the Value field (not as a secret reference)
 
 5. **Deploy:**
    - Click **"Deploy"**
-   - Wait for deployment (2-5 minutes)
-   - Your app will be live at: `https://gods-ping.vercel.app`
+   - Wait for build (2-5 minutes)
+   - ✅ Your app will be live!
+
+6. **Common Vercel Deployment Issues:**
+
+   **Problem: 404 NOT_FOUND**
+   - ✅ Fix: Make sure **Root Directory** is set to `frontend`
+   - Go to Project Settings → General → Root Directory → Edit → Set to `frontend`
+   
+   **Problem: Build fails with "vite: command not found"**
+   - ✅ Fix: Vercel should auto-detect Vite. Check Framework Preset is "Vite"
+   
+   **Problem: App loads but API calls fail (CORS)**
+   - ✅ Fix: Update Render CORS_ORIGINS (see next section)
 
 ---
 
