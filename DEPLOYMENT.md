@@ -142,14 +142,20 @@
 
 ## 🔄 Update Backend CORS
 
+**IMPORTANT: Do this immediately after frontend deploys!**
+
 After frontend is deployed, update backend environment variables on Render:
 
-1. Go to Render Dashboard → Your Service → Environment
-2. Update `CORS_ORIGINS`:
+1. Go to Render Dashboard → gods-ping-backend → **Environment**
+2. Find `CORS_ORIGINS` and click **Edit**
+3. Update the value to:
    ```
-   CORS_ORIGINS = https://gods-ping.vercel.app,http://localhost:5173
+   https://gods-ping.vercel.app,http://localhost:5173
    ```
-3. Save (this will trigger a redeploy)
+   (Replace `gods-ping.vercel.app` with your actual Vercel domain if different)
+4. Click **Save**
+5. Wait for automatic redeploy (~2-3 minutes)
+6. Test your frontend - login should work now! ✅
 
 ---
 
@@ -157,21 +163,34 @@ After frontend is deployed, update backend environment variables on Render:
 
 ### Test Backend
 - [ ] Visit: `https://gods-ping-backend.onrender.com/`
-- [ ] Should see: `{"message": "Gods Ping API"}`
+- [ ] Should see: `{"app":"Gods Ping (Shichi-Fukujin)","status":"running",...}`
 - [ ] Check: `https://gods-ping-backend.onrender.com/docs`
+- [ ] Verify CORS: `https://gods-ping-backend.onrender.com/api/debug/cors`
+  - Should show `allowed_origins` including your Vercel URL
 
 ### Test Frontend
 - [ ] Visit: `https://gods-ping.vercel.app`
-- [ ] Login with admin credentials
-- [ ] Check all features work
-- [ ] Test trading operations
+- [ ] Login with admin credentials (Admin / K@nph0ng69)
+- [ ] Check all features work:
+  - [ ] Balance loads (Account Balance section)
+  - [ ] Market data displays
+  - [ ] Logs tab opens (may be empty initially)
+  - [ ] Settings accessible
+- [ ] Test trading operations:
+  - [ ] Set Binance API keys in Settings
+  - [ ] Start Gods Hand bot
+  - [ ] Verify trades execute (paper trading)
+  - [ ] Check AI Thinking vs Action logs appear after bot runs
 
 ### Database
 - [ ] Backend automatically creates SQLite database
 - [ ] First deployment creates admin user
+- [ ] All tables created on startup (users, trades, bot_config, logs, paper_trading_snapshots)
 - [ ] For production, consider PostgreSQL:
   - Render provides free PostgreSQL
   - Update `DATABASE_URL` environment variable
+
+**Note:** AI Thinking and AI Action logs will only appear after you've started the Gods Hand bot and it has made recommendations. If those log categories are empty, run the bot first.
 
 ---
 
