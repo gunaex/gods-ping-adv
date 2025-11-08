@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { API_BASE_URL } from '../api';
 import { Activity } from 'lucide-react';
 import { colors, typography } from '../theme/colors';
 
@@ -16,10 +17,10 @@ export default function PaperTradingPerformance() {
   const loadPerformance = async () => {
     try {
       const [perfRes, histRes] = await Promise.all([
-        fetch('/api/paper-trading/performance', {
+        fetch(`${API_BASE_URL}/paper-trading/performance`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         }),
-        fetch('/api/paper-trading/history?days=7', {
+        fetch(`${API_BASE_URL}/paper-trading/history?days=7`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         })
       ]);

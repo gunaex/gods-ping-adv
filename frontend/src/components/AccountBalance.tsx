@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Wallet, TrendingUp, TrendingDown, DollarSign, RefreshCw } from 'lucide-react';
 import { colors, patterns } from '../theme/colors';
 import SettingsModal from './SettingsModal';
-import { settingsAPI } from '../api';
+import { settingsAPI, API_BASE_URL } from '../api';
 
 interface AccountBalanceProps {
   symbol: string;
@@ -45,7 +45,7 @@ export default function AccountBalance({ symbol, fiatCurrency }: AccountBalanceP
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/account/balance?fiat_currency=${fiatCurrency}`, {
+      const response = await fetch(`${API_BASE_URL}/account/balance?fiat_currency=${fiatCurrency}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }

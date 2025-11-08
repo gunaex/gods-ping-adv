@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Zap, Play, StopCircle, AlertTriangle, Settings } from 'lucide-react';
-import { botAPI } from '../api';
+import { botAPI, API_BASE_URL } from '../api';
 import { colors, typography } from '../theme/colors';
 
 interface GodsHandProps {
@@ -75,7 +75,7 @@ export default function GodsHand({ symbol }: GodsHandProps) {
 
   const loadBalance = async () => {
     try {
-      const response = await fetch('/api/account/balance?fiat_currency=USD', {
+      const response = await fetch(`${API_BASE_URL}/account/balance?fiat_currency=USD`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }

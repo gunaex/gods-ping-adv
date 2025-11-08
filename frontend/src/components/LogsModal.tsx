@@ -4,6 +4,7 @@ import {
   Settings, TrendingUp, Bot, Server, Filter, RefreshCw, Trash2
 } from 'lucide-react';
 import { formatLocalDateTime } from '../utils/timeUtils';
+import { API_BASE_URL } from '../api';
 import { colors, patterns } from '../theme/colors';
 
 interface LogEntry {
@@ -52,7 +53,7 @@ export default function LogsModal({ onClose }: LogsModalProps) {
     setLoading(true);
     try {
       const params = selectedCategory !== 'all' ? `?category=${selectedCategory}&limit=200` : '?limit=200';
-      const response = await fetch(`/api/logs${params}`, {
+      const response = await fetch(`${API_BASE_URL}/logs${params}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -71,7 +72,7 @@ export default function LogsModal({ onClose }: LogsModalProps) {
     
     try {
       const params = selectedCategory !== 'all' ? `?category=${selectedCategory}` : '';
-      await fetch(`/api/logs/clear${params}`, {
+      await fetch(`${API_BASE_URL}/logs/clear${params}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`

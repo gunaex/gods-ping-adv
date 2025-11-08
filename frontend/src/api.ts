@@ -1,9 +1,9 @@
 import axios from 'axios';
 
 // Use environment variable for API URL in production, fallback to /api for development
-const API_BASE_URL = import.meta.env.VITE_API_URL 
+export const API_BASE_URL = import.meta.env.VITE_API_URL 
   ? `${import.meta.env.VITE_API_URL}/api`
-  : '/api';
+  : (import.meta.env.DEV ? '/api' : 'https://gods-ping-backend.onrender.com/api');
 
 const api = axios.create({
   baseURL: API_BASE_URL,

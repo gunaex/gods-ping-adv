@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { API_BASE_URL } from '../api';
 import { TrendingUp, Target, AlertCircle, Activity } from 'lucide-react';
 
 interface ForecastProps {
@@ -88,7 +89,7 @@ export default function PriceForecast({ symbol }: ForecastProps) {
         
         const token = localStorage.getItem('token');
         const response = await fetch(
-          `http://localhost:8000/api/market/forecast/${symbol}?forecast_hours=6`,
+          `${API_BASE_URL}/market/forecast/${symbol}?forecast_hours=6`,
           {
             headers: {
               'Authorization': `Bearer ${token}`,
