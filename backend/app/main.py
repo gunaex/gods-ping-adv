@@ -137,6 +137,10 @@ async def startup_event():
     from app.db import DATABASE_URL
     print(f"🚀 Startup: Connecting to DB (masked): {str(DATABASE_URL)[:15]}...")
     
+    # Run schema migrations (add missing columns)
+    from app.migration import run_db_migrations
+    run_db_migrations()
+    
     db = next(get_db())
     created = ensure_admin_exists(db)
     if created:
