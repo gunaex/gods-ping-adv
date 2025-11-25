@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
-import { API_BASE_URL } from '../api';
-import { Activity } from 'lucide-react';
+import { botAPI, API_BASE_URL } from '../api';
+import { Activity, RefreshCw } from 'lucide-react';
 import { colors, typography } from '../theme/colors';
 
 export default function PaperTradingPerformance() {
   const [performance, setPerformance] = useState<any>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     loadPerformance();
@@ -41,6 +42,22 @@ export default function PaperTradingPerformance() {
     }
   };
 
+  const handleReset = async () => {
+    if (!confirm('Are you sure you want to reset all paper trading history? This cannot be undone.')) {
+      return;
+    }
+    setResetting(true);
+    try {
+      await botAPI.resetPaperTrading();
+      await loadPerformance();
+      alert('Paper trading history has been reset.');
+    } catch (error: any) {
+      alert('Failed to reset paper trading history: ' + (error.response?.data?.detail || error.message));
+    } finally {
+      setResetting(false);
+    }
+  };
+
   if (loading) {
     return <div className="section-card">Loading performance data...</div>;
   }
@@ -67,6 +84,24 @@ export default function PaperTradingPerformance() {
       <div className="section-title">
         <Activity />
         Paper Trading Performance (7 Day History)
+        <button 
+          onClick={handleReset} 
+          disabled={resetting}
+          style={{ 
+            marginLeft: 'auto', 
+            padding: '8px 12px',
+            background: colors.status.error.bg,
+            border: `1px solid ${colors.status.error.border}`,
+            color: colors.status.error.color,
+            borderRadius: typography.borderRadius.md,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
+        >
+          <RefreshCw size={14} />
+          {resetting ? 'Resetting...' : 'Reset History'}
+        </button>
       </div>
 
       {/* Performance Summary */}

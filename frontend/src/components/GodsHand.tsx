@@ -67,6 +67,8 @@ export default function GodsHand({ symbol }: GodsHandProps) {
     try {
       const response = await botAPI.getStatus();
       console.log('Bot status response:', response.data);
+      console.log('Tennis Mode Enabled:', response.data.tennis_mode_enabled);
+      console.log('Gods Mode Enabled:', response.data.gods_mode_enabled);
       setStatus(response.data);
     } catch (error) {
       console.error('Failed to load status');
@@ -363,6 +365,10 @@ export default function GodsHand({ symbol }: GodsHandProps) {
             <span style={{ fontSize: '1rem', color: colors.text.primary, fontWeight: 600 }}>
               Status: {status?.gods_hand || 'stopped'}
             </span>
+            {/* DEBUG: Show status flags */}
+            <span style={{ fontSize: '0.75rem', color: colors.text.muted, marginLeft: '10px' }}>
+              [Debug: G:{status?.gods_mode_enabled ? '✓' : '✗'} T:{status?.tennis_mode_enabled ? '✓' : '✗'}]
+            </span>
           </div>
           
           {/* Kill-Switch Status Display */}
@@ -380,6 +386,44 @@ export default function GodsHand({ symbol }: GodsHandProps) {
             }}>
               <span>⏸️</span>
               <span>Kill-switch cooldown: {status.kill_switch_cooldown.remaining_minutes}m remaining</span>
+            </div>
+          )}
+
+          {/* Gods Mode Status */}
+          {status?.gods_mode_enabled && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '6px 10px',
+              background: colors.primary.warmRed + '20',
+              border: `1px solid ${colors.primary.warmRed}`,
+              borderRadius: typography.borderRadius.sm,
+              fontSize: '0.85rem',
+              color: colors.primary.warmRed,
+              fontWeight: 600,
+            }}>
+              <span>🚀</span>
+              <span>GODS MODE Active</span>
+            </div>
+          )}
+
+          {/* Tennis Mode Status */}
+          {status?.tennis_mode_enabled && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '6px 10px',
+              background: colors.primary.sage + '20',
+              border: `1px solid ${colors.primary.sage}`,
+              borderRadius: typography.borderRadius.sm,
+              fontSize: '0.85rem',
+              color: colors.primary.sage,
+              fontWeight: 600,
+            }}>
+              <span>🎾</span>
+              <span>TENNIS MODE Active</span>
             </div>
           )}
           
@@ -482,6 +526,21 @@ function GodsHandSettingsModal({ config, onClose, onSave, onSaveRunSettings, con
     gods_mode_enabled: config?.gods_mode_enabled || false,
     tennis_mode_enabled: config?.tennis_mode_enabled || false,
   });
+
+  // Update settings when config changes
+  useEffect(() => {
+    if (config) {
+      setSettings({
+        paper_trading: config.paper_trading || false,
+        budget: config.budget || 1000,
+        risk_level: config.risk_level || 'medium',
+        min_confidence: config.min_confidence || 0.7,
+        gods_hand_enabled: config.gods_hand_enabled || false,
+        gods_mode_enabled: config.gods_mode_enabled || false,
+        tennis_mode_enabled: config.tennis_mode_enabled || false,
+      });
+    }
+  }, [config]);
 
   const [runSettings, setRunSettings] = useState({
     continuous: typeof continuous === 'boolean' ? continuous : true,
@@ -896,7 +955,13 @@ function GodsHandSettingsModal({ config, onClose, onSave, onSaveRunSettings, con
             Cancel
           </button>
           <button
-            onClick={() => { onSave(settings); onSaveRunSettings(runSettings.continuous, runSettings.intervalSeconds); }}
+            onClick={() => { 
+              console.log('💾 Saving settings:', settings);
+              console.log('   Gods Mode:', settings.gods_mode_enabled);
+              console.log('   Tennis Mode:', settings.tennis_mode_enabled);
+              onSave(settings); 
+              onSaveRunSettings(runSettings.continuous, runSettings.intervalSeconds); 
+            }}
             style={{
               flex: 1,
               padding: '14px',

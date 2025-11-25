@@ -304,6 +304,15 @@ async def gods_hand_once(user_id: int, config: BotConfig, db: Session) -> dict:
     base_step_percent = config.entry_step_percent if action == 'BUY' else config.exit_step_percent
     step_percent = min(base_step_percent * confidence_multiplier, 100.0)
 
+    # 🔍 Enhanced DEBUG: Step calculation
+    print(f"🔍 Step Calculation for {action}:")
+    print(f"   Base step percent: {base_step_percent}%")
+    print(f"   Confidence: {confidence:.2%}")
+    print(f"   Confidence multiplier: {confidence_multiplier:.2f}x")
+    print(f"   Final step percent: {step_percent:.1f}%")
+    print(f"   Max position size: ${max_position_size:.2f}")
+    print(f"   Expected step amount: ${max_position_size * (step_percent / 100):.2f}")
+
     incremental_calc = calculate_incremental_amount(
         current_position,
         max_position_size,
@@ -437,6 +446,18 @@ async def gods_hand_once(user_id: int, config: BotConfig, db: Session) -> dict:
 
     # Check if incremental trade can execute
     if not incremental_calc['can_execute']:
+        # 🔍 Enhanced debugging for skipped trades
+        print(f"❌ Trade SKIPPED for {symbol}:")
+        print(f"   AI Action: {action}")
+        print(f"   AI Confidence: {confidence:.2%}")
+        print(f"   Reason: {incremental_calc['reason']}")
+        print(f"   Can Execute: {incremental_calc['can_execute']}")
+        print(f"   Step Amount USD: ${incremental_calc.get('step_amount_usd', 0):.2f}")
+        print(f"   Current Fill: {incremental_calc.get('current_fill_percent', 0):.1f}%")
+        print(f"   After Fill: {incremental_calc.get('after_fill_percent', 0):.1f}%")
+        print(f"   Max Position Size: ${max_position_size:.2f}")
+        print(f"   Current Position Value: ${current_position['position_value_usd']:.2f}")
+        
         action_log = Log(
             timestamp=datetime.utcnow(),
             category=LogCategory.AI_ACTION,
@@ -479,6 +500,11 @@ async def gods_hand_once(user_id: int, config: BotConfig, db: Session) -> dict:
 
     # Execute incremental trade
     if action in ['BUY', 'SELL']:
+        # 🔍 DEBUG: Executing trade
+        print(f"✅ EXECUTING {action} trade for {symbol}:")
+        print(f"   Incremental calc passed: {incremental_calc['can_execute']}")
+        print(f"   Step amount: ${incremental_calc['step_amount_usd']:.2f}")
+        
         step_amount_usd = incremental_calc['step_amount_usd']
         current_price = risk_assessment['current_price']
         
@@ -645,6 +671,11 @@ async def gods_hand_once(user_id: int, config: BotConfig, db: Session) -> dict:
                 "message": f"Gods Hand executed {action} {step_percent}% step (live trading)"
             }
     else:
+        # 🔍 DEBUG: HOLD path
+        print(f"⏸️ HOLD action for {symbol}:")
+        print(f"   AI Action: {action}")
+        print(f"   Not in ['BUY', 'SELL']")
+        
         action_log = Log(
             timestamp=datetime.utcnow(),
             category=LogCategory.AI_ACTION,
@@ -992,19 +1023,30 @@ async def get_bot_status(user_id: int, db: Session) -> dict:
     kill_switch_info = None
     config = db.query(BotConfig).filter(BotConfig.user_id == user_id).first()
     
-    if config and config.kill_switch_last_trigger:
-        time_since_trigger = (datetime.utcnow() - config.kill_switch_last_trigger).total_seconds() / 60
-        cooldown_minutes = config.kill_switch_cooldown_minutes or 60
+    gods_mode_enabled = False
+    tennis_mode_enabled = False
+    if config:
+        gods_mode_enabled = config.gods_mode_enabled if hasattr(config, 'gods_mode_enabled') else False
+        tennis_mode_enabled = config.tennis_mode_enabled if hasattr(config, 'tennis_mode_enabled') else False
         
-        if time_since_trigger < cooldown_minutes:
-            remaining_minutes = cooldown_minutes - time_since_trigger
-            kill_switch_info = {
-                "active": True,
-                "remaining_minutes": round(remaining_minutes, 1),
-                "total_cooldown_minutes": cooldown_minutes,
-                "triggered_at": config.kill_switch_last_trigger.isoformat(),
-                "message": f"Kill-switch cooldown active: {remaining_minutes:.1f} minutes remaining"
-            }
+        # 🔍 DEBUG: Status flags
+        print(f"🔍 Bot Status for user {user_id}:")
+        print(f"   Gods Mode: {gods_mode_enabled}")
+        print(f"   Tennis Mode: {tennis_mode_enabled}")
+        
+        if config.kill_switch_last_trigger:
+            time_since_trigger = (datetime.utcnow() - config.kill_switch_last_trigger).total_seconds() / 60
+            cooldown_minutes = config.kill_switch_cooldown_minutes or 60
+            
+            if time_since_trigger < cooldown_minutes:
+                remaining_minutes = cooldown_minutes - time_since_trigger
+                kill_switch_info = {
+                    "active": True,
+                    "remaining_minutes": round(remaining_minutes, 1),
+                    "total_cooldown_minutes": cooldown_minutes,
+                    "triggered_at": config.kill_switch_last_trigger.isoformat(),
+                    "message": f"Kill-switch cooldown active: {remaining_minutes:.1f} minutes remaining"
+                }
     
     # Get consecutive breach info
     breach_info = None
@@ -1022,6 +1064,8 @@ async def get_bot_status(user_id: int, db: Session) -> dict:
         "grid": bot_status.get(f"grid_{user_id}", "stopped"),
         "dca": bot_status.get(f"dca_{user_id}", "stopped"),
         "gods_hand": bot_status.get(f"gods_hand_{user_id}", "stopped"),
+        "gods_mode_enabled": gods_mode_enabled,
+        "tennis_mode_enabled": tennis_mode_enabled,
         "kill_switch_cooldown": kill_switch_info,
         "kill_switch_breach_warning": breach_info,
         "timestamp": datetime.utcnow().isoformat()

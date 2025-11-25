@@ -100,6 +100,7 @@ class UpdateBotConfigRequest(BaseModel):
     dca_interval_days: Optional[int] = None
     gods_hand_enabled: Optional[bool] = None
     gods_mode_enabled: Optional[bool] = None
+    tennis_mode_enabled: Optional[bool] = None
     kill_switch_cooldown_minutes: Optional[int] = None
     kill_switch_consecutive_breaches: Optional[int] = None
     notification_email: Optional[str] = None
@@ -403,6 +404,15 @@ async def update_bot_config(
     
     # Update fields
     update_data = request.dict(exclude_unset=True)
+    
+    # 🔍 DEBUG: Log Tennis/Gods Mode updates
+    if 'tennis_mode_enabled' in update_data or 'gods_mode_enabled' in update_data:
+        print(f"🔍 Config Update for user {current_user['id']}:")
+        if 'gods_mode_enabled' in update_data:
+            print(f"   Gods Mode: {update_data['gods_mode_enabled']}")
+        if 'tennis_mode_enabled' in update_data:
+            print(f"   Tennis Mode: {update_data['tennis_mode_enabled']}")
+    
     for field, value in update_data.items():
         # Don't update password if it's the masked value
         if field == 'gmail_app_password' and value == '***':
